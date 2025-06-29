@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Excel, CSV & PDF Analyzer</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" defer></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js" defer></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.29/jspdf.plugin.autotable.min.js" defer></script>
+    
+    <!-- Шрифт с поддержкой кириллицы -->
+    <script src="https://cdn.jsdelivr.net/npm/jspdf-font@1.0.0/dist/fonts/NotoSans-Regular-normal.js" defer></script>
+    
+    <!-- Резервные CDN на случай недоступности основных -->
+    <script>
+        // Проверяем загрузку библиотек и подключаем резервные при необходимости
+        window.addEventListener('load', function() {
+            setTimeout(function() {
+                if (!window.jspdf) {
+                    console.log('Подключаю резервный CDN для jsPDF...');
+                    const script = document.createElement('script');
+                    script.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
+                    document.head.appendChild(script);
+                }
+                if (!window.html2canvas) {
+                    console.log('Подключаю резервный CDN для html2canvas...');
+                    const script = document.createElement('script');
+                    script.src = 'https://unpkg.com/html2canvas@latest/dist/html2canvas.min.js';
+                    document.head.appendChild(script);
+                }
+            }, 2000);
+        });
+    </script>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>📊 Excel, CSV & PDF Analyzer</h1>
+            <p>Загрузите Excel, CSV или PDF файл для анализа и визуализации данных</p>
+        </header>
+
+        <!-- Форма загрузки -->
+        <div class="upload-section" id="uploadSection">
+            <div class="upload-area" id="uploadArea">
+                <div class="upload-content">
+                    <div class="upload-icon">📁</div>
+                    <h3>Выберите файл</h3>
+                    <p>Поддерживаемые форматы: .xlsx, .xls, .csv, .pdf</p>
+                    <input type="file" id="fileInput" accept=".xlsx,.xls,.csv,.pdf" style="display: none;">
+                    <button class="btn btn-primary" onclick="document.getElementById('fileInput').click()">
+                        Выбрать файл
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Индикатор загрузки -->
+        <div class="loading" id="loading" style="display: none;">
+            <div class="spinner"></div>
+            <p>Обрабатываю файл...</p>
+        </div>
+
+        <!-- Результаты анализа -->
+        <div class="results" id="results" style="display: none;">
+            <!-- Информация о файле -->
+            <div class="file-info">
+                <h2>📄 Информация о файле</h2>
+                <div class="info-grid">
+                    <div class="info-item">
+                        <span class="label">Файл:</span>
+                        <span class="value" id="fileName"></span>
+                    </div>
+                    <div class="info-item">
+                        <span class="label">Строк:</span>
+                        <span class="value" id="totalRows"></span>
+                    </div>
+                    <div class="info-item">
+                        <span class="label">Столбцов:</span>
+                        <span class="value" id="totalColumns"></span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Базовая статистика -->
+            <div class="stats-section">
+                <h2>📈 Базовая статистика</h2>
+                <div class="stats-grid" id="statsGrid"></div>
+            </div>
+
+            <!-- Диаграммы -->
+            <div class="charts-section" id="chartsSection">
+                <h2>📊 Диаграммы</h2>
+                <div class="chart-controls">
+                    <label for="categorySelect">Выберите категорию для диаграммы:</label>
+                    <select id="categorySelect" onchange="updateCharts()">
+                        <option value="">Автоматический выбор</option>
+                    </select>
+                </div>
+                <div class="charts-grid" id="chartsGrid"></div>
+            </div>
+
+            <!-- Таблица данных -->
+            <div class="table-section">
+                <h2>📋 Данные</h2>
+                <div class="table-container">
+                    <table class="data-table" id="dataTable">
+                        <thead id="tableHeader"></thead>
+                        <tbody id="tableBody"></tbody>
+                    </table>
+                </div>
+                <div class="table-controls">
+                    <button class="btn btn-secondary" id="loadMoreBtn" onclick="loadMoreData()">
+                        Показать ещё 100 строк
+                    </button>
+                    <span class="rows-info" id="rowsInfo"></span>
+                </div>
+            </div>
+
+            <!-- Анализ от нейросети -->
+            <div class="ai-section">
+                <h2>🤖 Анализ от нейросети</h2>
+                <div class="ai-placeholder" id="aiPlaceholder">
+                    <div class="placeholder-content">
+                        <div class="placeholder-icon">🤖</div>
+                        <p>Здесь появится анализ от нейросети на английском языке</p>
+                        <p class="ai-note">AI analysis will be provided in English</p>
+                        <button class="btn btn-primary" onclick="requestAIAnalysis()">
+                            Запросить анализ
+                        </button>
+                    </div>
+                </div>
+                <div class="ai-result" id="aiResult" style="display: none;"></div>
+            </div>
+
+            <!-- Кнопка экспорта в PDF -->
+            <div class="export-section" id="exportSection" style="display: none;">
+                <div class="export-content">
+                    <button class="btn btn-success" id="downloadPdfBtn" onclick="generatePDF()">
+                        📄 Скачать PDF отчёт
+                    </button>
+                    <div class="export-info">
+                        <p>Отчёт будет содержать все данные, графики и AI анализ (на английском языке)</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Индикатор генерации PDF -->
+        <div class="pdf-loading" id="pdfLoading" style="display: none;">
+            <div class="spinner"></div>
+            <p>Генерирую PDF отчёт...</p>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+</html> 

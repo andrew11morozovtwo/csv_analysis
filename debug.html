@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug File Upload</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .debug-info { background: #f0f0f0; padding: 10px; margin: 10px 0; border-radius: 5px; }
+        .error { background: #ffebee; color: #c62828; }
+        .success { background: #e8f5e8; color: #2e7d32; }
+    </style>
+</head>
+<body>
+    <h1>Отладка загрузки файлов</h1>
+    
+    <div class="debug-info">
+        <h3>Статус сервера:</h3>
+        <div id="serverStatus">Проверяем...</div>
+    </div>
+    
+    <div class="debug-info">
+        <h3>Загрузка файла:</h3>
+        <input type="file" id="fileInput" accept=".xlsx,.xls,.csv,.pdf">
+        <button onclick="testUpload()">Загрузить файл</button>
+    </div>
+    
+    <div class="debug-info">
+        <h3>Результат:</h3>
+        <div id="result">Ожидание...</div>
+    </div>
+
+    <script>
+        // Проверяем статус сервера
+        async function checkServer() {
+            try {
+                const response = await fetch('/');
+                if (response.ok) {
+                    document.getElementById('serverStatus').innerHTML = 
+                        '<span class="success">✅ Сервер работает</span>';
+                } else {
+                    document.getElementById('serverStatus').innerHTML = 
+                        '<span class="error">❌ Сервер не отвечает</span>';
+                }
+            } catch (error) {
+                document.getElementById('serverStatus').innerHTML = 
+                    '<span class="error">❌ Ошибка подключения: ' + error.message + '</span>';
+            }
+        }
+
+        // Тестируем загрузку файла
+        async function testUpload() {
+            const fileInput = document.getElementById('fileInput');
+            const file = fileInput.files[0];
+            
+            if (!file) {
+                document.getElementById('result').innerHTML = 
+                    '<span class="error">❌ Файл не выбран</span>';
+                return;
+            }
+
+            document.getElementById('result').innerHTML = 'Загружаем файл...';
+
+            try {
+                const formData = new FormData();
+                formData.append('file', file);
+
+                console.log('Отправляем файл:', file.name);
+
+                const response = await fetch('/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                console.log('Статус ответа:', response.status);
+
+                if (response.ok) {
+                    const data = await response.json();
+                    console.log('Данные ответа:', data);
+
+                    if (data.success) {
+                        document.getElementById('result').innerHTML = 
+                            '<span class="success">✅ Файл успешно загружен!<br>' +
+                            'Строк: ' + data.total_rows + '<br>' +
+                            'Столбцов: ' + data.columns.length + '<br>' +
+                            'Типы данных: ' + Object.keys(data.data_types).join(', ') + '</span>';
+                    } else {
+                        document.getElementById('result').innerHTML = 
+                            '<span class="error">❌ Ошибка: ' + data.error + '</span>';
+                    }
+                } else {
+                    const errorText = await response.text();
+                    document.getElementById('result').innerHTML = 
+                        '<span class="error">❌ HTTP ошибка: ' + response.status + '<br>' + errorText + '</span>';
+                }
+            } catch (error) {
+                console.error('Ошибка:', error);
+                document.getElementById('result').innerHTML = 
+                    '<span class="error">❌ Ошибка: ' + error.message + '</span>';
+            }
+        }
+
+        // Проверяем сервер при загрузке страницы
+        checkServer();
+    </script>
+</body>
+</html> 
